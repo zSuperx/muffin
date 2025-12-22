@@ -1,7 +1,8 @@
 use std::vec;
 
-use crate::app::{App, Mode};
+use crate::app::{Global, Mode, State};
 use crate::tmux;
+use anyhow::Error;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Flex, Layout, Rect},
@@ -14,244 +15,246 @@ use ratatui::{
     },
 };
 
-impl<'a> App<'a> {
-    pub fn render_sessions(&mut self, area: Rect, buf: &mut Buffer) {
-        self.sessions = tmux::list_sessions().unwrap();
-        let block = Block::bordered().border_set(border::THICK);
+pub fn render_sessions(
+    area: Rect,
+    buf: &mut Buffer,
+    state: &mut State,
+    ctx: &mut Global,
+) -> Result<(), Error> {
+    state.sessions = tmux::list_sessions().unwrap();
+    let block = Block::bordered().border_set(border::THICK);
 
-        let inner_area = block.inner(area);
+    let inner_area = block.inner(area);
 
-        let [title_area, sessions_area, instructions_area] = Layout::vertical([
-            Constraint::Length(2),
+    let [title_area, sessions_area, instructions_area] = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Fill(1),
+        Constraint::Length(2),
+    ])
+    .spacing(1)
+    .areas(inner_area);
+
+    // Render title
+    {
+        Paragraph::new(Line::from("Sessions").underlined().bold().italic())
+            .centered()
+            .block(Block::new().borders(Borders::BOTTOM))
+            .render(title_area, buf);
+    }
+
+    // Render sessions
+    {
+        let max_name_len = state
+            .sessions
+            .iter()
+            .map(|s| s.name.len())
+            .max()
+            .unwrap_or(30)
+            .max(10)
+            + 2
+            + 2
+            + 5
+            + 9;
+
+        let [_, sessions_area, _] = Layout::horizontal([
             Constraint::Fill(1),
-            Constraint::Length(2),
+            Constraint::Length(max_name_len.try_into().unwrap_or(30)),
+            Constraint::Fill(1),
         ])
-        .spacing(1)
-        .areas(inner_area);
+        .areas(sessions_area);
 
-        // Render title
-        {
-            Paragraph::new(Line::from("Sessions").underlined().bold().italic())
-                .centered()
-                .block(Block::new().borders(Borders::BOTTOM))
-                .render(title_area, buf);
-        }
+        let sessions = state
+            .sessions
+            .iter()
+            .map(|s| {
+                let text = format!(
+                    "{:>2} 󱂬 - {:<10} {:<9}",
+                    s.windows,
+                    s.name,
+                    if s.active { " 󰞓 active" } else { "" }
+                );
+                let mut item = Line::from(text.clone());
+                if s.active {
+                    item = item.green();
+                }
+                ListItem::new(item)
+            })
+            .collect::<Vec<ListItem>>();
 
-        // Render sessions
-        {
-            let max_name_len = self
-                .sessions
-                .iter()
-                .map(|s| s.name.len())
-                .max()
-                .unwrap_or(30)
-                .max(10)
-                + 2
-                + 2
-                + 5
-                + 9;
-
-            let [_, sessions_area, _] = Layout::horizontal([
-                Constraint::Fill(1),
-                Constraint::Length(max_name_len.try_into().unwrap_or(30)),
-                Constraint::Fill(1),
-            ])
-            .areas(sessions_area);
-
-            let sessions = self
-                .sessions
-                .iter()
-                .map(|s| {
-                    let text = format!(
-                        "{:>2} 󱂬 - {:<10} {:<9}",
-                        s.windows,
-                        s.name,
-                        if s.active { " 󰞓 active" } else { "" }
-                    );
-                    let mut item = Line::from(text.clone());
-                    if s.active {
-                        item = item.green();
-                    }
-                    ListItem::new(item)
-                })
-                .collect::<Vec<ListItem>>();
-
-            StatefulWidget::render(
-                List::new(sessions)
-                    .highlight_symbol("")
-                    .highlight_spacing(HighlightSpacing::Always)
-                    .highlight_style(Style::new().italic().bold().cyan()),
-                sessions_area,
-                buf,
-                &mut self.session_list_state,
-            );
-        }
-
-        // Render instructions
-        {
-            let instructions = vec![
-                ("a", "create"),
-                ("r", "rename"),
-                ("enter", "switch"),
-                ("q", "quit"),
-                ("j/↓", "next"),
-                ("k/↑", "prev"),
-                ("g", "first"),
-                ("G", "last"),
-            ];
-
-            Paragraph::new(make_instructions(instructions))
-                .wrap(Wrap { trim: true })
-                .dark_gray()
-                .centered()
-                .render(instructions_area, buf);
-        }
-
-        block.render(area, buf);
+        StatefulWidget::render(
+            List::new(sessions)
+                .highlight_symbol("")
+                .highlight_spacing(HighlightSpacing::Always)
+                .highlight_style(Style::new().italic().bold().cyan()),
+            sessions_area,
+            buf,
+            &mut state.session_list_state,
+        );
     }
 
-    pub fn render_create(&mut self, area: Rect, buf: &mut Buffer) {
-        let area = centered_rect(area, 70, 50);
-        Clear.render(area, buf);
+    // Render instructions
+    {
+        let instructions = vec![
+            ("a", "create"),
+            ("r", "rename"),
+            ("enter", "switch"),
+            ("q", "quit"),
+            ("j/↓", "next"),
+            ("k/↑", "prev"),
+            ("g", "first"),
+            ("G", "last"),
+        ];
 
-        let block = Block::bordered().border_style(Style::new().blue());
-        let inner_area = block.inner(area);
-
-        let [title_area, input_area, instructions_area] = Layout::vertical([
-            Constraint::Length(2),
-            Constraint::Length(2),
-            Constraint::Length(1),
-        ])
-        .vertical_margin(1)
-        .horizontal_margin(1)
-        .areas(inner_area);
-
-        Line::from("Name new session".blue())
+        Paragraph::new(make_instructions(instructions))
+            .wrap(Wrap { trim: true })
+            .dark_gray()
             .centered()
-            .render(title_area, buf);
-
-        // Render input field
-        {
-            let [first_char, rest] =
-                Layout::horizontal([Constraint::Length(2), Constraint::Fill(1)])
-                    .horizontal_margin(3)
-                    .areas(input_area);
-
-            "> ".blue().render(first_char, buf);
-
-            self.text_area.set_placeholder_text("start typing!");
-            self.text_area
-                .set_placeholder_style(Style::new().dark_gray());
-            self.text_area.render(rest, buf);
-        }
-
-        // Render instructions
-        {
-            let instructions = vec![("esc", "cancel"), ("enter", "create")];
-
-            Paragraph::new(make_instructions(instructions))
-                .wrap(Wrap { trim: true })
-                .centered()
-                .render(instructions_area, buf);
-        }
-
-        block.render(area, buf);
+            .render(instructions_area, buf);
     }
 
-    pub fn render_rename(&mut self, area: Rect, buf: &mut Buffer) {
-        let area = centered_rect(area, 70, 50);
-        Clear.render(area, buf);
+    block.render(area, buf);
+    Ok(())
+}
 
-        let block = Block::bordered().border_style(Style::new().light_green());
-        let inner_area = block.inner(area);
+pub fn render_create(area: Rect, buf: &mut Buffer, state: &mut State, ctx: &mut Global) {
+    let area = centered_rect(area, 70, 50);
+    Clear.render(area, buf);
 
-        let [title_area, input_area, instructions_area] = Layout::vertical([
-            Constraint::Length(2),
-            Constraint::Length(2),
-            Constraint::Length(1),
-        ])
-        .vertical_margin(1)
-        .horizontal_margin(1)
-        .areas(inner_area);
+    let block = Block::bordered().border_style(Style::new().blue());
+    let inner_area = block.inner(area);
 
-        let index = self.session_list_state.selected().unwrap();
+    let [title_area, input_area, instructions_area] = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Length(2),
+        Constraint::Length(1),
+    ])
+    .vertical_margin(1)
+    .horizontal_margin(1)
+    .areas(inner_area);
 
-        Line::from(format!("Rename session '{}' to...", self.sessions[index].name).light_green())
+    Line::from("Name new session".blue())
+        .centered()
+        .render(title_area, buf);
+
+    // Render input field
+    {
+        let [first_char, rest] = Layout::horizontal([Constraint::Length(2), Constraint::Fill(1)])
+            .horizontal_margin(3)
+            .areas(input_area);
+
+        "> ".blue().render(first_char, buf);
+
+        state.text_area.set_placeholder_text("start typing!");
+        state.text_area
+            .set_placeholder_style(Style::new().dark_gray());
+        state.text_area.render(rest, buf);
+    }
+
+    // Render instructions
+    {
+        let instructions = vec![("esc", "cancel"), ("enter", "create")];
+
+        Paragraph::new(make_instructions(instructions))
+            .wrap(Wrap { trim: true })
             .centered()
-            .render(title_area, buf);
-
-        // Render input field
-        {
-            let [first_char, rest] =
-                Layout::horizontal([Constraint::Length(2), Constraint::Fill(1)])
-                    .horizontal_margin(3)
-                    .areas(input_area);
-
-            "> ".light_green().render(first_char, buf);
-
-            self.text_area.set_placeholder_text("start typing!");
-            self.text_area
-                .set_placeholder_style(Style::new().dark_gray());
-            self.text_area.render(rest, buf);
-        }
-
-        // Render instructions
-        {
-            let instructions = vec![("esc", "cancel"), ("enter", "rename")];
-
-            Paragraph::new(make_instructions(instructions))
-                .wrap(Wrap { trim: true })
-                .centered()
-                .render(instructions_area, buf);
-        }
-
-        block.render(area, buf);
+            .render(instructions_area, buf);
     }
 
-    pub fn render_delete(&mut self, area: Rect, buf: &mut Buffer) {
-        let area = centered_rect(area, 70, 50);
-        Clear.render(area, buf);
+    block.render(area, buf);
+}
 
-        let block = Block::bordered().border_style(Style::new().red());
-        let inner_area = block.inner(area);
+pub fn render_rename(area: Rect, buf: &mut Buffer, state: &mut State, ctx: &mut Global) {
+    let area = centered_rect(area, 70, 50);
+    Clear.render(area, buf);
 
-        let [title_area, instructions_area] =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)])
-                .vertical_margin(1)
-                .horizontal_margin(1)
-                .areas(inner_area);
+    let block = Block::bordered().border_style(Style::new().light_green());
+    let inner_area = block.inner(area);
 
-        let index = self.session_list_state.selected().unwrap();
+    let [title_area, input_area, instructions_area] = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Length(2),
+        Constraint::Length(1),
+    ])
+    .vertical_margin(1)
+    .horizontal_margin(1)
+    .areas(inner_area);
 
-        Line::from(format!("Delete session '{}'?", self.sessions[index].name).red())
+    let index = state.session_list_state.selected().unwrap();
+
+    Line::from(format!("Rename session '{}' to...", state.sessions[index].name).light_green())
+        .centered()
+        .render(title_area, buf);
+
+    // Render input field
+    {
+        let [first_char, rest] = Layout::horizontal([Constraint::Length(2), Constraint::Fill(1)])
+            .horizontal_margin(3)
+            .areas(input_area);
+
+        "> ".light_green().render(first_char, buf);
+
+        state.text_area.set_placeholder_text("start typing!");
+        state.text_area
+            .set_placeholder_style(Style::new().dark_gray());
+        state.text_area.render(rest, buf);
+    }
+
+    // Render instructions
+    {
+        let instructions = vec![("esc", "cancel"), ("enter", "rename")];
+
+        Paragraph::new(make_instructions(instructions))
+            .wrap(Wrap { trim: true })
             .centered()
-            .render(title_area, buf);
-
-        // Render instructions
-        {
-            let instructions = vec![("y/enter", "delete"), ("n/esc", "cancel")];
-
-            Paragraph::new(make_instructions(instructions))
-                .wrap(Wrap { trim: true })
-                .centered()
-                .render(instructions_area, buf);
-        }
-
-        block.render(area, buf);
+            .render(instructions_area, buf);
     }
 
+    block.render(area, buf);
+}
 
-    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
-        // Always render the sessions UI
-        self.render_sessions(area, buf);
+pub fn render_delete(area: Rect, buf: &mut Buffer, state: &mut State, ctx: &mut Global) {
+    let area = centered_rect(area, 70, 50);
+    Clear.render(area, buf);
 
-        match self.mode {
-            Mode::Main => {}
-            Mode::Create => self.render_create(area, buf),
-            Mode::Rename => self.render_rename(area, buf),
-            Mode::Delete => self.render_delete(area, buf),
-        }
+    let block = Block::bordered().border_style(Style::new().red());
+    let inner_area = block.inner(area);
+
+    let [title_area, instructions_area] =
+        Layout::vertical([Constraint::Fill(1), Constraint::Length(1)])
+            .vertical_margin(1)
+            .horizontal_margin(1)
+            .areas(inner_area);
+
+    let index = state.session_list_state.selected().unwrap();
+
+    Line::from(format!("Delete session '{}'?", state.sessions[index].name).red())
+        .centered()
+        .render(title_area, buf);
+
+    // Render instructions
+    {
+        let instructions = vec![("y/enter", "delete"), ("n/esc", "cancel")];
+
+        Paragraph::new(make_instructions(instructions))
+            .wrap(Wrap { trim: true })
+            .centered()
+            .render(instructions_area, buf);
     }
+
+    block.render(area, buf);
+}
+
+pub fn render(area: Rect, buf: &mut Buffer, state: &mut State, ctx: &mut Global) -> Result<(), Error> {
+    // Always render the sessions UI
+    render_sessions(area, buf, state, ctx);
+
+    match state.mode {
+        Mode::Main => {}
+        Mode::Create => render_create(area, buf, state, ctx),
+        Mode::Rename => render_rename(area, buf, state, ctx),
+        Mode::Delete => render_delete(area, buf, state, ctx),
+    }
+    Ok(())
 }
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
@@ -283,7 +286,9 @@ fn make_instructions<'a>(instructions: Vec<(&'a str, &'a str)>) -> Line<'a> {
     Line::from(
         instructions
             .iter()
-            .flat_map(|(key, desc)| vec![format!(" {}", key).gray(), format!(":{desc} ").dark_gray()])
+            .flat_map(|(key, desc)| {
+                vec![format!(" {}", key).gray(), format!(":{desc} ").dark_gray()]
+            })
             .collect::<Vec<Span>>(),
     )
 }
