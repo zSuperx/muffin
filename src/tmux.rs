@@ -43,7 +43,8 @@ pub fn rename_session(target: &str, new_name: &str) -> Result<(), String> {
 }
 
 pub fn delete_session(target: &str) -> Result<(), String> {
-    run_command("tmux", &["kill-session", "-t", target]).map(|_| ())
+    // run_command("tmux", &["kill-session", "-t", target]).map(|_| ())
+    Err("Some notification".to_string())
 }
 
 fn run_command(command: &str, args: &[&str]) -> Result<String, String> {

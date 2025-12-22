@@ -1,7 +1,6 @@
 use std::vec;
 
 use crate::app::{App, Mode};
-use crate::tmux;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Flex, Layout, Rect},
@@ -16,7 +15,6 @@ use ratatui::{
 
 impl<'a> App<'a> {
     pub fn render_sessions(&mut self, area: Rect, buf: &mut Buffer) {
-        self.sessions = tmux::list_sessions().unwrap();
         let block = Block::bordered().border_set(border::THICK);
 
         let inner_area = block.inner(area);
@@ -215,17 +213,27 @@ impl<'a> App<'a> {
         let block = Block::bordered().border_style(Style::new().red());
         let inner_area = block.inner(area);
 
-        let [title_area, instructions_area] =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)])
-                .vertical_margin(1)
-                .horizontal_margin(1)
-                .areas(inner_area);
+        let [title_area, instructions_area] = Layout::vertical([
+            Constraint::Fill(1),
+            Constraint::Length(1),
+        ])
+        .vertical_margin(1)
+        .horizontal_margin(1)
+        .areas(inner_area);
 
         let index = self.session_list_state.selected().unwrap();
 
-        Line::from(format!("Delete session '{}'?", self.sessions[index].name).red())
-            .centered()
-            .render(title_area, buf);
+        // Render title
+        {
+            let content = match self.notification.clone() {
+                Some(msg) => msg,
+                None => format!("Delete session '{}'?", self.sessions[index].name),
+            };
+
+            Line::from(content.red())
+                .centered()
+                .render(title_area, buf);
+        }
 
         // Render instructions
         {
@@ -284,7 +292,9 @@ fn make_instructions<'a>(instructions: Vec<(&'a str, &'a str)>) -> Line<'a> {
     Line::from(
         instructions
             .iter()
-            .flat_map(|(key, desc)| vec![format!(" {}", key).gray(), format!(":{desc} ").dark_gray()])
+            .flat_map(|(key, desc)| {
+                vec![format!(" {}", key).gray(), format!(":{desc} ").dark_gray()]
+            })
             .collect::<Vec<Span>>(),
     )
 }
