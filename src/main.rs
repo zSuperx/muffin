@@ -1,9 +1,8 @@
-use crate::app::App;
+use app::app::App;
 use std::io;
 
 mod tmux;
 mod app;
-mod render;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> io::Result<()> {
