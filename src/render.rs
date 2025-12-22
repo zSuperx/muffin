@@ -239,10 +239,9 @@ impl<'a> App<'a> {
 
         block.render(area, buf);
     }
-}
 
-impl<'a> Widget for &mut App<'a> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
+
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         // Always render the sessions UI
         self.render_sessions(area, buf);
 
