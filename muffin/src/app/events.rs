@@ -12,6 +12,7 @@ impl<'a> App<'a> {
         }
         match self.mode {
             Mode::Main => self.handle_key_main(key_event),
+            // Mode::Presets => self.handle_key_presets(key_event),
             Mode::Create => self.handle_key_create(key_event),
             Mode::Rename => self.handle_key_rename(key_event),
             Mode::Delete => self.handle_key_delete(key_event),
@@ -39,6 +40,21 @@ impl<'a> App<'a> {
                     tmux_helper::switch_session(&self.sessions[index].name).unwrap()
                 };
             }
+            _ => {}
+        }
+    }
+
+    fn handle_key_presets(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Tab => self.mode = Mode::Main,
+
+            // Movement
+            KeyCode::Down | KeyCode::Char('j') => self.select_next(),
+            KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
+            KeyCode::Char('g') => self.select_first(),
+            KeyCode::Char('M') => self.select_middle(),
+            KeyCode::Char('G') => self.select_last(),
+
             _ => {}
         }
     }

@@ -12,6 +12,9 @@ use ratatui::{DefaultTerminal, Frame};
 
 use tmux_helper::{self, Session};
 
+use crate::app::menus::sessions::SessionsMenu;
+use crate::app::menus::traits::Menu;
+
 #[derive(Debug, Clone, Default)]
 pub enum Mode {
     #[default]
@@ -21,28 +24,17 @@ pub enum Mode {
     Delete,
 }
 
-pub struct App<'a> {
-    pub exit: bool,
-    pub session_list_state: ListState,
-    pub sessions: Vec<Session>,
-    pub mode: Mode,
-    pub text_area: TextArea<'a>,
-    pub event_handler: EventHandler,
-    pub notification: Option<(Mode, String)>,
+pub struct App {
+    pub state: AppState,
+    pub current_menu: Box<dyn Menu>
+        pub event_handler: EventHandler,
 }
 
-impl<'a> Default for App<'a> {
-    fn default() -> Self {
-        Self {
-            exit: false,
-            session_list_state: Default::default(),
-            sessions: Vec::new(),
-            mode: Mode::Main,
-            text_area: Default::default(),
-            event_handler: EventHandler::new(),
-            notification: None,
-        }
-    }
+pub struct AppState {
+    pub session_list_state: ListState,
+    pub sessions: Vec<Session>,
+    pub exit: bool,
+    pub mode: Mode,
 }
 
 #[derive(Clone, Debug)]
@@ -105,6 +97,20 @@ impl EventHandler {
 }
 
 impl<'a> App<'a> {
+    fn new() -> Self {
+        Self {
+            state: AppState {
+                mode: Mode::Main,
+                exit: false,
+                sessions: Vec::new(),
+                session_list_state: ListState::default(),
+            },
+            event_handler: EventHandler::new(),
+            current_menu: SessionsMenu,
+
+        }
+    }
+
     /// runs the application's main loop until the user quits
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         self.sessions = tmux_helper::list_sessions().unwrap();
@@ -122,10 +128,11 @@ impl<'a> App<'a> {
                 AppEvent::ClearNotification => self.notification = None,
                 AppEvent::Tick => {
                     should_reload_tmux = false;
-                    terminal.draw(|frame| self.draw(frame))?;
                 }
                 _ => {}
             };
+
+            terminal.draw(|frame| self.draw(frame))?;
 
             // Reload tmux session list on all non-Tick events
             if should_reload_tmux {
