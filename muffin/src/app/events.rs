@@ -1,8 +1,8 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tui_textarea::TextArea;
 
-use super::super::app::*;
-use crate::tmux::tmux;
+use super::app::*;
+use tmux_helper;
 
 impl<'a> App<'a> {
     pub fn handle_key(&mut self, key_event: KeyEvent) {
@@ -20,17 +20,23 @@ impl<'a> App<'a> {
 
     fn handle_key_main(&mut self, key_event: KeyEvent) {
         match key_event.code {
-            KeyCode::Char('q') => self.exit(),
+            // Movement
             KeyCode::Down | KeyCode::Char('j') => self.select_next(),
             KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
             KeyCode::Char('g') => self.select_first(),
+            KeyCode::Char('M') => self.select_middle(),
             KeyCode::Char('G') => self.select_last(),
+
+            // Mode switching
             KeyCode::Char('a') => self.mode = Mode::Create,
             KeyCode::Char('r') => self.mode = Mode::Rename,
             KeyCode::Char('d') => self.mode = Mode::Delete,
+
+            // Control
+            KeyCode::Char('q') => self.exit(),
             KeyCode::Enter => {
                 if let Some(index) = self.session_list_state.selected() {
-                    tmux::switch_session(&self.sessions[index].name).unwrap()
+                    tmux_helper::switch_session(&self.sessions[index].name).unwrap()
                 };
             }
             _ => {}
@@ -44,7 +50,7 @@ impl<'a> App<'a> {
                 self.mode = Mode::Main;
             }
             KeyCode::Enter => {
-                match tmux::create_session(&self.text_area.lines().join("\n")) {
+                match tmux_helper::create_session(&self.text_area.lines().join("\n")) {
                     Ok(_) => {
                         self.text_area = TextArea::default();
                         self.mode = Mode::Main;
@@ -64,7 +70,7 @@ impl<'a> App<'a> {
             }
             KeyCode::Enter => {
                 if let Some(index) = self.session_list_state.selected() {
-                    match tmux::rename_session(
+                    match tmux_helper::rename_session(
                         &self.sessions[index].name,
                         &self.text_area.lines().join(""),
                     ) {
@@ -84,7 +90,7 @@ impl<'a> App<'a> {
         match key_event.code {
             KeyCode::Char('y') | KeyCode::Enter => {
                 if let Some(index) = self.session_list_state.selected() {
-                    match tmux::delete_session(&self.sessions[index].name) {
+                    match tmux_helper::delete_session(&self.sessions[index].name) {
                         Ok(_) => {
                             self.text_area = TextArea::default();
                             self.mode = Mode::Main;

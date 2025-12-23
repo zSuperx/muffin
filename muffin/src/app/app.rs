@@ -10,7 +10,7 @@ use crossterm::event::{KeyEvent};
 use ratatui::widgets::ListState;
 use ratatui::{DefaultTerminal, Frame};
 
-use crate::tmux::tmux::{self, Session};
+use tmux_helper::{self, Session};
 
 #[derive(Debug, Clone, Default)]
 pub enum Mode {
@@ -107,7 +107,7 @@ impl EventHandler {
 impl<'a> App<'a> {
     /// runs the application's main loop until the user quits
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        self.sessions = tmux::list_sessions().unwrap();
+        self.sessions = tmux_helper::list_sessions().unwrap();
         let active_index = self.sessions.iter().position(|s| s.active);
         self.session_list_state.select(active_index);
 
@@ -129,7 +129,7 @@ impl<'a> App<'a> {
 
             // Reload tmux session list on all non-Tick events
             if should_reload_tmux {
-                self.sessions = tmux::list_sessions().unwrap()
+                self.sessions = tmux_helper::list_sessions().unwrap()
             }
         }
 
@@ -163,6 +163,14 @@ impl<'a> App<'a> {
 
     pub fn select_first(&mut self) {
         self.session_list_state.select_first();
+    }
+
+    pub fn select_middle(&mut self) {
+        let length = self.sessions.len();
+        if length > 0 {
+            let new_index = (length - 1).div_ceil(2);
+            self.session_list_state.select(Some(new_index));
+        }
     }
 
     pub fn select_last(&mut self) {

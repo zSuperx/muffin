@@ -1,7 +1,6 @@
 use app::app::App;
 use std::io;
 
-mod tmux;
 mod app;
 
 #[tokio::main(flavor = "current_thread")]
