@@ -1,10 +1,9 @@
-use ratatui::{buffer::Buffer, layout::Rect};
+use ratatui::{DefaultTerminal, buffer::Buffer, layout::Rect, widgets::StatefulWidget};
 
 use crate::app::app::AppState;
 
 use super::super::app::AppEvent;
 
 pub trait Menu {
-    fn handle_event(&mut self, event: AppEvent);
-    fn render(&mut self, area: Rect, buf: &mut Buffer, state: &AppState);
+    fn handle_event(&mut self, event: AppEvent, state: &mut AppState, terminal: &mut DefaultTerminal);
 }

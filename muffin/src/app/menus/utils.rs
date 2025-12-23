@@ -1,8 +1,12 @@
+use std::time::Duration;
+
 use ratatui::{
     layout::{Constraint, Flex, Layout, Rect},
     style::Stylize,
     text::{Line, Span},
 };
+
+use crate::app::app::{AppEvent, EventHandler, Mode};
 
 #[allow(unused)]
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
@@ -39,4 +43,18 @@ pub fn make_instructions<'a>(instructions: Vec<(&'a str, &'a str)>) -> Line<'a> 
             })
             .collect::<Vec<Span>>(),
     )
+}
+
+
+pub fn send_timed_notification(event_handler: &EventHandler, msg: String) {
+    let tx = event_handler.tx.clone();
+
+    // Immediately show notification
+    let _ = tx.send(AppEvent::ShowNotification(msg));
+
+    // Spawn a background task to clear it after 3 seconds
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(3)).await;
+        let _ = tx.send(AppEvent::ClearNotification);
+    });
 }

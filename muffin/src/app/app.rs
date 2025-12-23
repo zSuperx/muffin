@@ -6,12 +6,15 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tui_textarea::TextArea;
 
-use crossterm::event::{KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::widgets::ListState;
 use ratatui::{DefaultTerminal, Frame};
 
 use tmux_helper::{self, Session};
 
+use crate::app::menus::create::CreateMenu;
+use crate::app::menus::delete::DeleteMenu;
+use crate::app::menus::rename::RenameMenu;
 use crate::app::menus::sessions::SessionsMenu;
 use crate::app::menus::traits::Menu;
 
@@ -26,13 +29,12 @@ pub enum Mode {
 
 pub struct App {
     pub state: AppState,
-    pub current_menu: Box<dyn Menu>
-        pub event_handler: EventHandler,
 }
 
 pub struct AppState {
-    pub session_list_state: ListState,
+    pub event_handler: EventHandler,
     pub sessions: Vec<Session>,
+    pub selected_session: Option<usize>,
     pub exit: bool,
     pub mode: Mode,
 }
@@ -42,7 +44,7 @@ pub enum AppEvent {
     Error,
     Tick,
     Key(KeyEvent),
-    ShowNotification((Mode, String)),
+    ShowNotification(String),
     ClearNotification,
 }
 
@@ -96,95 +98,49 @@ impl EventHandler {
     }
 }
 
-impl<'a> App<'a> {
-    fn new() -> Self {
+impl App {
+    pub fn new() -> Self {
         Self {
             state: AppState {
                 mode: Mode::Main,
                 exit: false,
                 sessions: Vec::new(),
-                session_list_state: ListState::default(),
+                selected_session: None,
+                event_handler: EventHandler::new(),
             },
-            event_handler: EventHandler::new(),
-            current_menu: SessionsMenu,
-
         }
     }
 
     /// runs the application's main loop until the user quits
-    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
-        self.sessions = tmux_helper::list_sessions().unwrap();
-        let active_index = self.sessions.iter().position(|s| s.active);
-        self.session_list_state.select(active_index);
+    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<(), ()> {
+        self.state.sessions = tmux_helper::list_sessions().unwrap();
+        let active_index = self.state.sessions.iter().position(|s| s.active);
+        self.state.selected_session = active_index;
 
-        let mut should_reload_tmux;
+        let mut create_menu = CreateMenu::default();
+        let mut rename_menu = RenameMenu::default();
+        let mut delete_menu = DeleteMenu::default();
+        let mut sessions_menu = SessionsMenu::default();
 
-        while !self.exit {
-            should_reload_tmux = true;
-            let event = self.event_handler.next().await.unwrap();
-            match event {
-                AppEvent::Key(key_event) => self.handle_key(key_event),
-                AppEvent::ShowNotification(x) => self.notification = Some(x),
-                AppEvent::ClearNotification => self.notification = None,
-                AppEvent::Tick => {
-                    should_reload_tmux = false;
-                }
-                _ => {}
-            };
+        while !self.state.exit {
+            let event = self.state.event_handler.next().await?;
+            let should_reload_tmux = !matches!(event, AppEvent::Tick);
+            match self.state.mode {
+                Mode::Main => sessions_menu.handle_event(event, &mut self.state, terminal),
+                Mode::Create => create_menu.handle_event(event, &mut self.state, terminal),
+                Mode::Rename => rename_menu.handle_event(event, &mut self.state, terminal),
+                Mode::Delete => delete_menu.handle_event(event, &mut self.state, terminal),
+            }
 
-            terminal.draw(|frame| self.draw(frame))?;
-
-            // Reload tmux session list on all non-Tick events
-            if should_reload_tmux {
-                self.sessions = tmux_helper::list_sessions().unwrap()
+            if should_reload_tmux  {
+                self.state.sessions = tmux_helper::list_sessions().unwrap();
             }
         }
 
         Ok(())
     }
 
-    pub fn send_timed_notification(&mut self, mode: Mode, msg: String) {
-        let tx = self.event_handler.tx.clone();
-
-        // Immediately show notification
-        let _ = tx.send(AppEvent::ShowNotification((mode, msg)));
-
-        // Spawn a background task to clear it after 3 seconds
-        tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(3)).await;
-            let _ = tx.send(AppEvent::ClearNotification);
-        });
-    }
-
-    fn draw(&mut self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
-    }
-
-    pub fn select_next(&mut self) {
-        self.session_list_state.select_next();
-    }
-
-    pub fn select_previous(&mut self) {
-        self.session_list_state.select_previous();
-    }
-
-    pub fn select_first(&mut self) {
-        self.session_list_state.select_first();
-    }
-
-    pub fn select_middle(&mut self) {
-        let length = self.sessions.len();
-        if length > 0 {
-            let new_index = (length - 1).div_ceil(2);
-            self.session_list_state.select(Some(new_index));
-        }
-    }
-
-    pub fn select_last(&mut self) {
-        self.session_list_state.select_last();
-    }
-
-    pub fn exit(&mut self) {
-        self.exit = true;
-    }
+    // fn draw(&mut self, frame: &mut Frame) {
+    //     frame.render_widget(self, frame.area());
+    // }
 }

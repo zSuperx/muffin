@@ -1,28 +1,24 @@
 use super::traits::Menu;
 use crate::app::{
-    app::{AppState, EventHandler},
-    menus::utils::{centered_fixed_rect, make_instructions},
+    app::{AppEvent, AppState, EventHandler, Mode},
+    menus::utils::{centered_fixed_rect, make_instructions, send_timed_notification},
 };
+use crossterm::event::KeyCode;
 use ratatui::{
-    prelude::{self, Buffer, Constraint, Layout},
-    style::{Style, Stylize},
-    symbols::border,
-    text::Line,
-    widgets::{
-        Block, Borders, Clear, HighlightSpacing, List, ListItem, ListState, Paragraph,
-        StatefulWidget, Widget, Wrap,
-    },
+    DefaultTerminal, prelude::{self, Buffer, Constraint, Layout}, style::{Style, Stylize}, text::Line, widgets::{Block, Clear, Paragraph, StatefulWidget, Widget, Wrap}
 };
 use tui_textarea::TextArea;
 
+#[derive(Default)]
 pub struct RenameMenu<'a> {
     text_area: TextArea<'a>,
-    handler: &'a EventHandler,
     notification: Option<String>,
 }
 
-impl<'a> Menu for &mut RenameMenu<'a> {
-    fn render(&mut self, area: prelude::Rect, buf: &mut Buffer, state: &AppState) {
+impl<'a> StatefulWidget for &mut RenameMenu<'a> {
+    type State = AppState;
+
+    fn render(self, area: prelude::Rect, buf: &mut Buffer, state: &mut AppState) {
         let area = centered_fixed_rect(area, 40, 15);
         Clear.render(area, buf);
 
@@ -38,10 +34,9 @@ impl<'a> Menu for &mut RenameMenu<'a> {
         .horizontal_margin(1)
         .areas(inner_area);
 
-        let index = state.session_list_state.selected().unwrap();
-
         // Render title
         {
+            let index = state.selected_session.unwrap();
             let content = match self.notification.clone() {
                 Some(msg) => msg,
                 _ => format!("Rename session '{}' to...", state.sessions[index].name),
@@ -79,8 +74,36 @@ impl<'a> Menu for &mut RenameMenu<'a> {
 
         block.render(area, buf);
     }
+}
 
-    fn handle_event(&mut self, event: crate::app::app::AppEvent) {
-        todo!()
+impl<'a> Menu for RenameMenu<'a> {
+    fn handle_event(&mut self, event: AppEvent, state: &mut AppState, terminal: &mut DefaultTerminal) {
+        match event {
+            AppEvent::Tick => _ = terminal.draw(|frame| frame.render_stateful_widget(self, frame.area(), state)).unwrap(),
+            AppEvent::Key(key_event) => match key_event.code {
+                KeyCode::Esc => {
+                    self.text_area = TextArea::default();
+                    state.mode = Mode::Main;
+                }
+                KeyCode::Enter => {
+                    if let Some(index) = state.selected_session {
+                        match tmux_helper::rename_session(
+                            &state.sessions[index].name,
+                            &self.text_area.lines().join(""),
+                        ) {
+                            Ok(_) => {
+                                self.text_area = TextArea::default();
+                                state.mode = Mode::Main;
+                            }
+                            Err(s) => send_timed_notification(&state.event_handler, s),
+                        }
+                    };
+                }
+                _ => _ = self.text_area.input(key_event),
+            },
+            AppEvent::ShowNotification(msg) => self.notification = Some(msg),
+            AppEvent::ClearNotification => self.notification = None,
+            _ => {}
+        }
     }
 }
