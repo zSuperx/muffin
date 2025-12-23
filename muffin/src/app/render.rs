@@ -14,10 +14,11 @@ use ratatui::{
 };
 
 impl<'a> App<'a> {
-    pub fn render_sessions(&mut self, area: Rect, buf: &mut Buffer) {
+    pub fn render_main(&mut self, area: Rect, buf: &mut Buffer) {
         let block = Block::bordered().border_set(border::THICK);
 
         let inner_area = block.inner(area);
+        Clear::default().render(inner_area, buf);
 
         let [title_area, sessions_area, instructions_area] = Layout::vertical([
             Constraint::Length(2),
@@ -83,6 +84,51 @@ impl<'a> App<'a> {
                 buf,
                 &mut self.session_list_state,
             );
+        }
+
+        // Render instructions
+        {
+            let instructions = vec![
+                ("a", "create"),
+                ("r", "rename"),
+                ("enter", "switch"),
+                ("q", "quit"),
+                ("j/↓", "next"),
+                ("k/↑", "prev"),
+                ("g", "first"),
+                ("G", "last"),
+            ];
+
+            Paragraph::new(make_instructions(instructions))
+                .wrap(Wrap { trim: true })
+                .dark_gray()
+                .centered()
+                .render(instructions_area, buf);
+        }
+
+        block.render(area, buf);
+    }
+
+    pub fn render_presets(&mut self, area: Rect, buf: &mut Buffer) {
+        let block = Block::bordered().border_set(border::THICK);
+
+        let inner_area = block.inner(area);
+        Clear::default().render(inner_area, buf);
+
+        let [title_area, sessions_area, instructions_area] = Layout::vertical([
+            Constraint::Length(2),
+            Constraint::Fill(1),
+            Constraint::Length(2),
+        ])
+        .spacing(1)
+        .areas(inner_area);
+
+        // Render title
+        {
+            Paragraph::new(Line::from("Presets").underlined().bold().italic())
+                .centered()
+                .block(Block::new().borders(Borders::BOTTOM))
+                .render(title_area, buf);
         }
 
         // Render instructions
@@ -263,11 +309,12 @@ impl<'a> App<'a> {
 impl<'a> Widget for &mut App<'a> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         // Always render the sessions UI
-        self.render_sessions(area, buf);
+        self.render_main(area, buf);
 
         match self.mode {
             Mode::Main => {}
             Mode::Create => self.render_create(area, buf),
+            Mode::Presets => self.render_presets(area, buf),
             Mode::Rename => self.render_rename(area, buf),
             Mode::Delete => self.render_delete(area, buf),
         }

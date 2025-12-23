@@ -15,6 +15,7 @@ impl<'a> App<'a> {
             Mode::Create => self.handle_key_create(key_event),
             Mode::Rename => self.handle_key_rename(key_event),
             Mode::Delete => self.handle_key_delete(key_event),
+            Mode::Presets => self.handle_key_presets(key_event),
         };
     }
 
@@ -31,6 +32,7 @@ impl<'a> App<'a> {
             KeyCode::Char('a') => self.mode = Mode::Create,
             KeyCode::Char('r') => self.mode = Mode::Rename,
             KeyCode::Char('d') => self.mode = Mode::Delete,
+            KeyCode::Tab => self.mode = Mode::Presets,
 
             // Control
             KeyCode::Char('q') => self.exit(),
@@ -39,6 +41,25 @@ impl<'a> App<'a> {
                     tmux_helper::switch_session(&self.sessions[index].name).unwrap()
                 };
             }
+            _ => {}
+        }
+    }
+
+    fn handle_key_presets(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            // Movement
+            KeyCode::Down | KeyCode::Char('j') => self.select_next(),
+            KeyCode::Up | KeyCode::Char('k') => self.select_previous(),
+            KeyCode::Char('g') => self.select_first(),
+            KeyCode::Char('M') => self.select_middle(),
+            KeyCode::Char('G') => self.select_last(),
+
+            // Mode switching
+            KeyCode::Tab => self.mode = Mode::Main,
+
+            // Control
+            KeyCode::Char('q') => self.exit(),
+            KeyCode::Enter => {}
             _ => {}
         }
     }

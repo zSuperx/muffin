@@ -16,6 +16,7 @@ use tmux_helper::{self, Session};
 pub enum Mode {
     #[default]
     Main,
+    Presets,
     Create,
     Rename,
     Delete,
@@ -25,6 +26,7 @@ pub struct App<'a> {
     pub exit: bool,
     pub session_list_state: ListState,
     pub sessions: Vec<Session>,
+    pub presets: Vec<Session>,
     pub mode: Mode,
     pub text_area: TextArea<'a>,
     pub event_handler: EventHandler,
@@ -37,6 +39,7 @@ impl<'a> Default for App<'a> {
             exit: false,
             session_list_state: Default::default(),
             sessions: Vec::new(),
+            presets: Vec::new(),
             mode: Mode::Main,
             text_area: Default::default(),
             event_handler: EventHandler::new(),
