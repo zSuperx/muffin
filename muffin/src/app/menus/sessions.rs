@@ -1,6 +1,7 @@
 use super::Menu;
 use crate::app::{
-    driver::{AppEvent, AppState, Mode}, menus::sessions, utils::{make_instructions, send_timed_notification}
+    driver::{AppEvent, AppState, Mode},
+    utils::{make_instructions, send_timed_notification},
 };
 use crossterm::event::KeyCode;
 use ratatui::{
@@ -141,14 +142,16 @@ impl StatefulWidget for &mut SessionsMenu {
                 })
                 .collect::<Vec<ListItem>>();
 
-            state
-                .sessions
-                .iter()
-                .map(|s| if s.active { "   active" } else { "" })
-                .collect::<Vec<&str>>()
-                .join("\n")
-                .green()
-                .render(active_status_area, buf);
+            Paragraph::new(
+                state
+                    .sessions
+                    .iter()
+                    .map(|s| if s.active { "   active" } else { "" })
+                    .collect::<Vec<&str>>()
+                    .join("\n"),
+            )
+            .green()
+            .render(active_status_area, buf);
 
             StatefulWidget::render(
                 List::new(sessions)
@@ -223,7 +226,7 @@ impl Menu for SessionsMenu {
                                 "Already attached!".into(),
                             );
                         } else {
-                            tmux::switch_session(&state.sessions[index].name).unwrap()
+                            tmux::switch_session(&state.sessions[index].name).unwrap();
                         }
                     };
                 }

@@ -226,7 +226,6 @@ pub fn list_sessions() -> Result<Vec<Session>, String> {
         })
         .collect::<Vec<Session>>();
 
-    sessions.sort_by_key(|a| !a.active);
     Ok(sessions)
 }
 
