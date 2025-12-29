@@ -109,7 +109,7 @@ fn apply_layout_recursive(pane_target: &str, node: &LayoutNode) -> Result<(), St
             )?;
             // run command if provided
             if let Some(cmd) = command {
-                run_command("tmux", &["send-keys", "-t", pane_target, &cmd, "Enter"])?;
+                run_command("tmux", &["send-keys", "-t", pane_target, cmd, "Enter"])?;
             }
             Ok(())
         }
@@ -142,7 +142,7 @@ fn apply_layout_recursive(pane_target: &str, node: &LayoutNode) -> Result<(), St
                 // Split the window.
                 // The 'old' index stays as the 'child', the 'new' index is the 'rest'.
                 let (sess, win, new_index) =
-                    split_window(&current_pane_target, split_p, &direction)?;
+                    split_window(&current_pane_target, split_p, direction)?;
 
                 let next_pane_target = format!("{}:{}.{}", sess, win, new_index);
 

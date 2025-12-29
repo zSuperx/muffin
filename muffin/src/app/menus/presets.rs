@@ -208,7 +208,7 @@ impl Menu for PresetsMenu {
                 KeyCode::Char('q') => state.exit = true,
                 KeyCode::Enter => {
                     if let Some(index) = state.selected_preset {
-                        match tmux::spawn_preset(&state.presets.values().nth(index).unwrap()) {
+                        match tmux::spawn_preset(state.presets.values().nth(index).unwrap()) {
                             Ok(_) => {
                                 state.mode = Mode::Sessions;
                             }
