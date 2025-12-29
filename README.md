@@ -35,7 +35,8 @@ flake's package derivation)_
 
 The following demo runs with [`presets.kdl`](examples/presets.kdl):
 
-![Muffin Demo](examples/muffin-demo.mp4)
+<video src="https://github.com/zSuperx/muffin/raw/refs/heads/master/examples/muffin-demo.mp4" controls="controls" style="max-width: 100%;">
+</video>
 
 ## Building
 
