@@ -1,7 +1,7 @@
 use super::Menu;
 use crate::app::{
     driver::{AppEvent, AppState, Mode},
-    utils::make_instructions,
+    utils::{make_instructions, send_timed_notification},
 };
 use crossterm::event::KeyCode;
 use ratatui::{
@@ -10,7 +10,8 @@ use ratatui::{
     symbols::border,
     text::Line,
     widgets::{
-        Block, Borders, Clear, HighlightSpacing, List, ListItem, ListState, Paragraph, StatefulWidget, Widget, Wrap
+        Block, Borders, Clear, HighlightSpacing, List, ListItem, ListState, Paragraph,
+        StatefulWidget, Widget, Wrap,
     },
 };
 
@@ -80,11 +81,11 @@ impl StatefulWidget for &mut PresetsMenu {
         let [
             title_area,
             notification_area,
-            sessions_area,
+            presets_area,
             instructions_area,
         ] = Layout::vertical([
             Constraint::Length(2),
-            Constraint::Max(1),
+            Constraint::Max(2),
             Constraint::Fill(1),
             Constraint::Length(2),
         ])
@@ -103,61 +104,61 @@ impl StatefulWidget for &mut PresetsMenu {
         {
             let content = match self.notification.clone() {
                 Some(msg) => msg.red(),
-                None => "This feature is still in development!".into(),
+                None => format!("Reading presets from {}", state.presets_path).into(),
             };
             Paragraph::new(Line::from(content.italic()))
                 .centered()
                 .render(notification_area, buf);
         }
 
-        // Render sessions
+        // Render presets
         {
-            let max_name_len = state
-                .presets
-                .iter()
-                .map(|s| s.name.len())
-                .max()
-                .unwrap_or(30)
-                .max(10)
-                + 2
-                + 2
-                + 5
-                + 9;
-
-            let [_, sessions_area, _] = Layout::horizontal([
+            let sessions_width = 20;
+            let [_, presets_area, running_status_area, _] = Layout::horizontal([
                 Constraint::Fill(1),
-                Constraint::Length(max_name_len.try_into().unwrap_or(30)),
+                Constraint::Length(sessions_width),
+                Constraint::Length(11),
                 Constraint::Fill(1),
             ])
-            .areas(sessions_area);
+            .areas(presets_area);
 
-            let sessions = state
+            let presets = state
                 .presets
-                .iter()
+                .values()
                 .map(|s| {
-                    let text = format!(
-                        "{:>2} 󱂬 - {:<10} {:<9}",
-                        s.windows,
-                        s.name,
-                        if s.active { " 󰞓 active" } else { "" }
-                    );
-                    let mut item = Line::from(text.clone());
-                    if s.active {
-                        item = item.green();
-                    }
+                    let truncated_name = if s.name.len() > sessions_width as usize - 8 {
+                        let mut name = s.name.clone();
+                        name.truncate(sessions_width as usize - 11);
+                        format!("{}...", name)
+                    } else {
+                        s.name.clone()
+                    };
+                    let text = format!("{:>2}  - {}", s.windows.len(), truncated_name);
+                    let item = Line::from(text.clone());
                     ListItem::new(item)
                 })
                 .collect::<Vec<ListItem>>();
 
             StatefulWidget::render(
-                List::new(sessions)
+                List::new(presets)
                     .highlight_symbol("")
                     .highlight_spacing(HighlightSpacing::Always)
                     .highlight_style(Style::new().italic().bold().cyan()),
-                sessions_area,
+                presets_area,
                 buf,
                 &mut self.list_state,
             );
+
+            Paragraph::new(
+                state
+                    .presets
+                    .values()
+                    .map(|s| if s.running { "   running" } else { "" })
+                    .collect::<Vec<&str>>()
+                    .join("\n"),
+            )
+            .green()
+            .render(running_status_area, buf);
         }
 
         // Render instructions
@@ -167,8 +168,6 @@ impl StatefulWidget for &mut PresetsMenu {
                 ("q", "quit"),
                 ("j/↓", "next"),
                 ("k/↑", "prev"),
-                ("g", "first"),
-                ("G", "last"),
                 ("tab", "view sessions"),
             ];
 
@@ -188,9 +187,15 @@ impl Menu for PresetsMenu {
         match event {
             AppEvent::Key(key_event) => match key_event.code {
                 // Movement
-                KeyCode::Down | KeyCode::Char('j') => state.selected_preset = self.select_next(state.presets.len()),
-                KeyCode::Up | KeyCode::Char('k') => state.selected_preset = self.select_previous(state.presets.len()),
-                KeyCode::Char('g') => state.selected_preset = self.select_first(state.presets.len()),
+                KeyCode::Down | KeyCode::Char('j') => {
+                    state.selected_preset = self.select_next(state.presets.len())
+                }
+                KeyCode::Up | KeyCode::Char('k') => {
+                    state.selected_preset = self.select_previous(state.presets.len())
+                }
+                KeyCode::Char('g') => {
+                    state.selected_preset = self.select_first(state.presets.len())
+                }
                 KeyCode::Char('M') => {
                     state.selected_preset = self.select_middle(state.presets.len())
                 }
@@ -203,7 +208,12 @@ impl Menu for PresetsMenu {
                 KeyCode::Char('q') => state.exit = true,
                 KeyCode::Enter => {
                     if let Some(index) = state.selected_preset {
-                        // tmux::switch_session(&state.presets[index].name).unwrap()
+                        match tmux::spawn_preset(&state.presets.values().nth(index).unwrap()) {
+                            Ok(_) => {
+                                state.mode = Mode::Sessions;
+                            }
+                            Err(s) => send_timed_notification(&state.event_handler, s),
+                        }
                     };
                 }
                 _ => {}

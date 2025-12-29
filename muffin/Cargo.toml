@@ -13,3 +13,5 @@ regex = "1.12.2"
 tokio = { version = "1.44.0", features = ["full"] }
 tui-textarea = "0.7.0"
 tmux = { path = "../tmux" }
+parser = { path = "../parser" }
+shellexpand = "3.1.1"

@@ -1,0 +1,20 @@
+sessions:
+  - name: "zNix"
+    directory: "~/zNix/"
+    windows:
+      - name: "zNix"
+        layout:
+          direction: vertical
+          children:
+            - Pane:
+              cwd: "~/zNix"
+              command: "nvim"
+              percentage: 80
+            - Split:
+              percentage: 20
+              direction: horizontal
+              children:
+                - Pane:
+                  percentage: 80
+                - Pane:
+                  percentage: 20

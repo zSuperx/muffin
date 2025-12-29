@@ -168,13 +168,11 @@ impl StatefulWidget for &mut SessionsMenu {
         {
             let instructions = vec![
                 ("enter", "switch"),
-                ("a", "create"),
-                ("r", "rename"),
                 ("q", "quit"),
                 ("j/↓", "next"),
                 ("k/↑", "prev"),
-                ("g", "first"),
-                ("G", "last"),
+                ("a", "create"),
+                ("r", "rename"),
                 ("tab", "view presets"),
             ];
 

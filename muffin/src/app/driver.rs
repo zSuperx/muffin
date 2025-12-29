@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use futures::{FutureExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -5,14 +7,14 @@ use tokio::task::JoinHandle;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::DefaultTerminal;
 
-use tmux::{self, Session};
+use tmux::{self, Preset, Session};
 
+use crate::app::menus::Menu;
 use crate::app::menus::create::CreateMenu;
 use crate::app::menus::delete::DeleteMenu;
 use crate::app::menus::presets::PresetsMenu;
 use crate::app::menus::rename::RenameMenu;
 use crate::app::menus::sessions::SessionsMenu;
-use crate::app::menus::Menu;
 
 #[derive(Debug, Clone, Default)]
 pub enum Mode {
@@ -31,7 +33,8 @@ pub struct App {
 pub struct AppState {
     pub event_handler: EventHandler,
     pub sessions: Vec<Session>,
-    pub presets: Vec<Session>,
+    pub presets: BTreeMap<String, Preset>,
+    pub presets_path: String,
     pub selected_session: Option<usize>,
     pub selected_preset: Option<usize>,
     pub exit: bool,
@@ -94,14 +97,19 @@ impl EventHandler {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(
+        sessions: Vec<Session>,
+        presets: BTreeMap<String, Preset>,
+        presets_file: String,
+    ) -> Self {
         Self {
             state: AppState {
                 mode: Mode::Sessions,
                 exit: false,
-                sessions: Vec::new(),
+                sessions,
                 selected_session: None,
-                presets: Vec::new(),
+                presets,
+                presets_path: presets_file,
                 selected_preset: None,
                 event_handler: EventHandler::new(),
             },
@@ -109,10 +117,14 @@ impl App {
     }
 
     /// runs the application's main loop until the user quits
-    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<(), ()> {
-        self.state.sessions = tmux::list_sessions().unwrap_or_default();
+    pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<(), String> {
         let active_index = self.state.sessions.iter().position(|s| s.active);
         self.state.selected_session = active_index;
+        self.state.selected_preset = if self.state.presets.len() == 0 {
+            None
+        } else {
+            Some(0)
+        };
 
         let mut create_menu = CreateMenu::default();
         let mut rename_menu = RenameMenu::default();
@@ -145,10 +157,15 @@ impl App {
                         }
                     }
                 })
-                .unwrap();
+                .map_err(|_| "Terminal rendering error".to_string())?;
 
             // Get next event
-            let event = self.state.event_handler.next().await?;
+            let event = self
+                .state
+                .event_handler
+                .next()
+                .await
+                .map_err(|_| "Error with event handler!".to_string())?;
 
             if matches!(event, AppEvent::Key(KeyEvent { modifiers, code, .. })
                 if modifiers == KeyModifiers::CONTROL
@@ -158,6 +175,7 @@ impl App {
             }
 
             // Handle said event
+            // TODO: This looks stupid
             match self.state.mode {
                 Mode::Sessions => sessions_menu.handle_event(event, &mut self.state),
                 Mode::Create => create_menu.handle_event(event, &mut self.state),
@@ -167,7 +185,20 @@ impl App {
             }
 
             // Refresh tmux sessions on each keystroke
-            self.state.sessions = tmux::list_sessions().unwrap_or_default();
+            self.state.sessions = tmux::list_sessions()?;
+
+            // TODO: This hurts the time complexity part of my brain. Fix it?
+            for preset in self.state.presets.values_mut() {
+                preset.running = false;
+            }
+
+            // Required to update which presets are running and which are dead
+            // Fortunately, this uses a BTreeMap now so it's not as bad as a regular Vec<Preset>
+            for session in self.state.sessions.iter() {
+                if let Some(v) = self.state.presets.get_mut(&session.name) {
+                    v.running = true;
+                }
+            }
         }
 
         Ok(())

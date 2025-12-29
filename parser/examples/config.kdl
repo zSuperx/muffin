@@ -1,0 +1,19 @@
+session name="zNix" cwd="~/zNix/" {
+  window {
+    split direction="h" {
+      pane command="nvim" percentage=70
+      split direction="v" {
+        pane command="git status" percentage=70
+        pane
+      }
+    }
+  }
+
+  window name="server-flake" cwd="~/server-modules/" {
+    split {
+      pane command="nvim" percentage=1
+      pane command="echo hi" percentage=1
+      pane percentage=1
+    }
+  }
+}

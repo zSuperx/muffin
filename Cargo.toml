@@ -6,3 +6,16 @@ members = [
     "tmux",
     "parser",
 ]
+
+# The TUI is already fast enough, might as well opt for size
+# These options leave it in a semi-unstable state and increase
+# compile time, but I'm a victim of optimization syndrome
+# I'll address problems as they appear, but this works for now!
+[profile.release]
+strip = "debuginfo"
+overflow-checks = false # Chat am i trolling?
+lto = true
+codegen-units = 1
+panic = "abort"
+opt-level = "s"
+debug = 0
