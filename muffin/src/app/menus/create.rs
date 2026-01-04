@@ -1,6 +1,6 @@
 use super::Menu;
 use crate::app::{
-    driver::{AppEvent, AppState, AppMode},
+    driver::{AppEvent, AppMode, AppState},
     utils::{centered_fixed_rect, make_instructions, send_timed_notification},
 };
 use crossterm::event::KeyCode;
@@ -85,15 +85,13 @@ impl<'a> Menu for CreateMenu<'a> {
                     self.text_area = TextArea::default();
                     state.mode = AppMode::Sessions;
                 }
-                KeyCode::Enter => {
-                    match tmux::create_session(&self.text_area.lines().join("\n")) {
-                        Ok(_) => {
-                            self.text_area = TextArea::default();
-                            state.mode = AppMode::Sessions;
-                        }
-                        Err(s) => send_timed_notification(&state.event_handler, s),
+                KeyCode::Enter => match tmux::create_session(&self.text_area.lines().join("\n")) {
+                    Ok(_) => {
+                        self.text_area = TextArea::default();
+                        state.mode = AppMode::Sessions;
                     }
-                }
+                    Err(s) => send_timed_notification(&state.event_handler, s),
+                },
                 _ => _ = self.text_area.input(key_event),
             },
             AppEvent::ShowNotification(msg) => self.notification = Some(msg),

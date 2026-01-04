@@ -1,6 +1,6 @@
 use super::Menu;
 use crate::app::{
-    driver::{AppEvent, AppState, AppMode},
+    driver::{AppEvent, AppMode, AppState},
     utils::{make_instructions, send_timed_notification},
 };
 use crossterm::event::KeyCode;
@@ -211,7 +211,22 @@ impl Menu for PresetsMenu {
                     if let Some(index) = state.selected_preset {
                         match tmux::spawn_preset(state.presets.values().nth(index).unwrap()) {
                             Ok(_) => {
-                                state.mode = AppMode::Sessions;
+                                if state.exit_on_switch {
+                                    match tmux::switch_session(
+                                        &state.presets.values().nth(index).unwrap().name,
+                                    ) {
+                                        Ok(_) => {
+                                            if state.exit_on_switch {
+                                                state.exit = true;
+                                            }
+                                        }
+                                        Err(msg) => {
+                                            send_timed_notification(&state.event_handler, msg)
+                                        }
+                                    }
+                                } else {
+                                    state.mode = AppMode::Sessions;
+                                }
                             }
                             Err(s) => send_timed_notification(&state.event_handler, s),
                         }

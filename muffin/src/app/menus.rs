@@ -9,7 +9,7 @@ use crate::app::driver::{AppEvent, AppState};
 pub trait Menu {
     /// How the menu should handle the event.
     ///
-    /// This can involve manipulating state, which can result in state transitions 
+    /// This can involve manipulating state, which can result in state transitions
     /// (i.e) on Escape, a menu can set state.mode = AppMode::Sessions
     fn handle_event(&mut self, event: AppEvent, state: &mut AppState);
 
