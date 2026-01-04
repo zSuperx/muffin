@@ -8,7 +8,7 @@ use ratatui::{
     prelude::{Buffer, Constraint, Layout, Rect},
     style::{Style, Stylize},
     symbols::border,
-    text::{Line, Span, Text},
+    text::{Line, Text},
     widgets::{
         Block, Borders, Clear, HighlightSpacing, List, ListItem, ListState, Paragraph,
         StatefulWidget, Widget, Wrap,
@@ -74,7 +74,7 @@ impl<'a> SessionsMenu<'a> {
     }
 
     pub fn select_middle(&mut self, state: &mut AppState) -> Option<usize> {
-        if self.displayed_sessions.len() > 0 {
+        if !self.displayed_sessions.is_empty() {
             let new_index = (self.displayed_sessions.len().saturating_sub(1)).div_ceil(2);
             self.list_state.select(Some(new_index));
         }
