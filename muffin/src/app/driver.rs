@@ -17,7 +17,7 @@ use crate::app::menus::rename::RenameMenu;
 use crate::app::menus::sessions::SessionsMenu;
 
 #[derive(Debug, Clone, Default)]
-pub enum Mode {
+pub enum AppMode {
     #[default]
     Sessions,
     Presets,
@@ -38,7 +38,7 @@ pub struct AppState {
     pub selected_session: Option<usize>,
     pub selected_preset: Option<usize>,
     pub exit: bool,
-    pub mode: Mode,
+    pub mode: AppMode,
 }
 
 #[derive(Clone, Debug)]
@@ -104,7 +104,7 @@ impl App {
     ) -> Self {
         Self {
             state: AppState {
-                mode: Mode::Sessions,
+                mode: AppMode::Sessions,
                 exit: false,
                 sessions,
                 selected_session: None,
@@ -118,7 +118,7 @@ impl App {
 
     /// runs the application's main loop until the user quits
     pub async fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<(), String> {
-        let active_index = self.state.sessions.iter().position(|s| s.active);
+        let active_index = self.state.sessions.iter().position(|s| s.attached);
         self.state.selected_session = active_index;
         self.state.selected_preset = if self.state.presets.is_empty() {
             None
@@ -129,10 +129,18 @@ impl App {
         let mut create_menu = CreateMenu::default();
         let mut rename_menu = RenameMenu::default();
         let mut delete_menu = DeleteMenu::default();
-        let mut sessions_menu = SessionsMenu::new(active_index);
+        let mut sessions_menu = SessionsMenu::new(self.state.sessions.len(), active_index);
         let mut presets_menu = PresetsMenu::new(active_index);
 
         while !self.state.exit {
+            match self.state.mode {
+                AppMode::Sessions => sessions_menu.pre_render(&mut self.state),
+                AppMode::Create => create_menu.pre_render(&mut self.state),
+                AppMode::Rename => rename_menu.pre_render(&mut self.state),
+                AppMode::Delete => delete_menu.pre_render(&mut self.state),
+                AppMode::Presets => presets_menu.pre_render(&mut self.state),
+            };
+
             // Draw phase
             terminal
                 .draw(|frame| {
@@ -142,17 +150,17 @@ impl App {
                     frame.render_stateful_widget(&mut sessions_menu, area, &mut self.state);
 
                     match self.state.mode {
-                        Mode::Create => {
+                        AppMode::Create => {
                             frame.render_stateful_widget(&mut create_menu, area, &mut self.state)
                         }
-                        Mode::Rename => {
+                        AppMode::Rename => {
                             frame.render_stateful_widget(&mut rename_menu, area, &mut self.state)
                         }
-                        Mode::Delete => {
+                        AppMode::Delete => {
                             frame.render_stateful_widget(&mut delete_menu, area, &mut self.state)
                         }
-                        Mode::Sessions => {} // Nothing extra to draw
-                        Mode::Presets => {
+                        AppMode::Sessions => {} // Nothing extra to draw
+                        AppMode::Presets => {
                             frame.render_stateful_widget(&mut presets_menu, area, &mut self.state)
                         }
                     }
@@ -177,12 +185,12 @@ impl App {
             // Handle said event
             // TODO: This looks stupid
             match self.state.mode {
-                Mode::Sessions => sessions_menu.handle_event(event, &mut self.state),
-                Mode::Create => create_menu.handle_event(event, &mut self.state),
-                Mode::Rename => rename_menu.handle_event(event, &mut self.state),
-                Mode::Delete => delete_menu.handle_event(event, &mut self.state),
-                Mode::Presets => presets_menu.handle_event(event, &mut self.state),
-            }
+                AppMode::Sessions => sessions_menu.handle_event(event, &mut self.state),
+                AppMode::Create => create_menu.handle_event(event, &mut self.state),
+                AppMode::Rename => rename_menu.handle_event(event, &mut self.state),
+                AppMode::Delete => delete_menu.handle_event(event, &mut self.state),
+                AppMode::Presets => presets_menu.handle_event(event, &mut self.state),
+            };
 
             // Refresh tmux sessions on each keystroke
             self.state.sessions = tmux::list_sessions()?;

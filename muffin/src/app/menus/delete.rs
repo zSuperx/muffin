@@ -1,6 +1,6 @@
 use super::Menu;
 use crate::app::{
-    driver::{AppEvent, AppState, Mode},
+    driver::{AppEvent, AppState, AppMode},
     utils::{centered_fixed_rect, make_instructions, send_timed_notification},
 };
 use crossterm::event::KeyCode;
@@ -68,13 +68,13 @@ impl<'a> Menu for DeleteMenu<'a> {
                         match tmux::delete_session(&state.sessions[index].name) {
                             Ok(_) => {
                                 self.text_area = TextArea::default();
-                                state.mode = Mode::Sessions;
+                                state.mode = AppMode::Sessions;
                             }
                             Err(s) => send_timed_notification(&state.event_handler, s),
                         }
                     };
                 }
-                KeyCode::Char('n') | KeyCode::Esc => state.mode = Mode::Sessions,
+                KeyCode::Char('n') | KeyCode::Esc => state.mode = AppMode::Sessions,
                 _ => {}
             },
             AppEvent::ShowNotification(msg) => self.notification = Some(msg),
