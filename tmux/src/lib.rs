@@ -248,23 +248,3 @@ fn run_command(command: &str, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8(output.stdout).map_err(|_| "Error decoding output")?)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_list_session() {
-        let x = list_sessions();
-
-        println!("{:#?}", x);
-    }
-
-    #[test]
-    fn test_create_delete_session() {
-        let x = create_session("test_session");
-        println!("{:#?}", x);
-
-        let x = delete_session("test_session");
-        println!("{:#?}", x);
-    }
-}

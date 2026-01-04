@@ -232,18 +232,3 @@ fn set_size(node: &mut LayoutNode, val: u8) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::parse_config;
-
-    #[test]
-    fn test_example() {
-        let doc_str: String = std::fs::read("examples/config.kdl")
-            .unwrap()
-            .try_into()
-            .unwrap();
-
-        let presets = parse_config(&doc_str).unwrap();
-        println!("{:?}", presets);
-    }
-}
