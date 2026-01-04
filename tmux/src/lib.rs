@@ -5,6 +5,7 @@ use std::process::Command;
 pub struct Session {
     pub name: String,
     pub windows: String,
+    pub attached: bool,
     pub active: bool,
 }
 
@@ -190,6 +191,7 @@ pub fn split_window(
 
 pub fn list_sessions() -> Result<Vec<Session>, String> {
     let output = run_command("tmux", &["list-sessions"])?;
+    let active_session_name = run_command("tmux", &["display-message", "-p", "'#S'"])?;
 
     let active_regex = Regex::new(r"\(attached\)$").unwrap();
     let windows_regex = Regex::new(r"^(.+?): (\d+).*").unwrap();
@@ -199,10 +201,13 @@ pub fn list_sessions() -> Result<Vec<Session>, String> {
         .map(|line| {
             let captures = windows_regex.captures(line).unwrap();
 
+            let name = captures[1].to_string();
+
             Session {
-                name: captures[1].to_string(),
                 windows: captures[2].to_string(),
-                active: active_regex.is_match(line),
+                attached: active_regex.is_match(line),
+                active: name == active_session_name.trim().trim_matches('\''),
+                name
             }
         })
         .collect::<Vec<Session>>();

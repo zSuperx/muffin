@@ -1,6 +1,6 @@
 use super::Menu;
 use crate::app::{
-    driver::{AppEvent, AppState, Mode},
+    driver::{AppEvent, AppState, AppMode},
     utils::{make_instructions, send_timed_notification},
 };
 use crossterm::event::KeyCode;
@@ -108,6 +108,7 @@ impl StatefulWidget for &mut PresetsMenu {
             };
             Paragraph::new(Line::from(content.italic()))
                 .centered()
+                .wrap(Wrap { trim: false })
                 .render(notification_area, buf);
         }
 
@@ -202,7 +203,7 @@ impl Menu for PresetsMenu {
                 KeyCode::Char('G') => state.selected_preset = self.select_last(state.presets.len()),
 
                 // Mode switching
-                KeyCode::Tab => state.mode = Mode::Sessions,
+                KeyCode::Tab => state.mode = AppMode::Sessions,
 
                 // Control
                 KeyCode::Char('q') => state.exit = true,
@@ -210,7 +211,7 @@ impl Menu for PresetsMenu {
                     if let Some(index) = state.selected_preset {
                         match tmux::spawn_preset(state.presets.values().nth(index).unwrap()) {
                             Ok(_) => {
-                                state.mode = Mode::Sessions;
+                                state.mode = AppMode::Sessions;
                             }
                             Err(s) => send_timed_notification(&state.event_handler, s),
                         }
