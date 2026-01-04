@@ -344,10 +344,14 @@ impl<'a> Menu for SessionsMenu<'a> {
                             // of tmux sessions
                             let global_selected_index =
                                 self.displayed_sessions[local_selected_index];
-                            if let Err(msg) =
-                                tmux::switch_session(&state.sessions[global_selected_index].name)
+                            match tmux::switch_session(&state.sessions[global_selected_index].name)
                             {
-                                send_timed_notification(&state.event_handler, msg);
+                                Ok(_) => {
+                                    if state.exit_on_switch {
+                                        state.exit = true;
+                                    }
+                                }
+                                Err(msg) => send_timed_notification(&state.event_handler, msg),
                             }
                         };
                     }

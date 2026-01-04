@@ -191,7 +191,18 @@ pub fn split_window(
 
 pub fn list_sessions() -> Result<Vec<Session>, String> {
     let output = run_command("tmux", &["list-sessions"])?;
-    let active_session_name = run_command("tmux", &["display-message", "-p", "'#S'"])?;
+    let active_session_name = match std::env::var("TMUX_PANE") {
+        Ok(tmux_pane_env) => Some(
+            run_command(
+                "tmux",
+                &["display-message", "-t", &tmux_pane_env, "-p", "'#S'"],
+            )?
+            .trim()
+            .trim_matches('\'')
+            .to_string(),
+        ),
+        Err(_) => None,
+    };
 
     let active_regex = Regex::new(r"\(attached\)$").unwrap();
     let windows_regex = Regex::new(r"^(.+?): (\d+).*").unwrap();
@@ -201,13 +212,13 @@ pub fn list_sessions() -> Result<Vec<Session>, String> {
         .map(|line| {
             let captures = windows_regex.captures(line).unwrap();
 
-            let name = captures[1].to_string();
+            let name = Some(captures[1].to_string());
 
             Session {
                 windows: captures[2].to_string(),
                 attached: active_regex.is_match(line),
-                active: name == active_session_name.trim().trim_matches('\''),
-                name
+                active: name == active_session_name,
+                name: name.unwrap(),
             }
         })
         .collect::<Vec<Session>>();
@@ -247,4 +258,3 @@ fn run_command(command: &str, args: &[&str]) -> Result<String, String> {
 
     Ok(String::from_utf8(output.stdout).map_err(|_| "Error decoding output")?)
 }
-

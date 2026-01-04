@@ -1,6 +1,6 @@
 use super::Menu;
 use crate::app::{
-    driver::{AppEvent, AppState, AppMode},
+    driver::{AppEvent, AppMode, AppState},
     utils::{centered_fixed_rect, make_instructions, send_timed_notification},
 };
 use crossterm::event::KeyCode;

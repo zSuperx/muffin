@@ -4,7 +4,9 @@ use kdl::{KdlDocument, KdlNode};
 use tmux::{LayoutNode, Preset, SplitDirection, Window};
 
 pub fn parse_config(doc_str: &str) -> Result<BTreeMap<String, Preset>, String> {
-    let doc: KdlDocument = doc_str.parse().unwrap();
+    let doc: KdlDocument = doc_str
+        .parse()
+        .map_err(|_| "Error parsing file".to_string())?;
 
     let nodes: &[KdlNode] = doc.nodes();
 
@@ -231,4 +233,3 @@ fn set_size(node: &mut LayoutNode, val: u8) {
         LayoutNode::Split { size, .. } => *size = val,
     }
 }
-

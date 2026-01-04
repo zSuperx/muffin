@@ -38,6 +38,7 @@ pub struct AppState {
     pub selected_session: Option<usize>,
     pub selected_preset: Option<usize>,
     pub exit: bool,
+    pub exit_on_switch: bool,
     pub mode: AppMode,
 }
 
@@ -101,11 +102,13 @@ impl App {
         sessions: Vec<Session>,
         presets: BTreeMap<String, Preset>,
         presets_file: String,
+        exit_on_switch: bool
     ) -> Self {
         Self {
             state: AppState {
                 mode: AppMode::Sessions,
                 exit: false,
+                exit_on_switch,
                 sessions,
                 selected_session: None,
                 presets,
