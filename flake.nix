@@ -9,12 +9,15 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in
     {
-      packages.${system}.default = pkgs.rustPlatform.buildRustPackage {
-        pname = "muffin";
-        version = "1.0.0";
-        cargoLock.lockFile = ./Cargo.lock;
-        src = pkgs.lib.cleanSource ./.;
-        meta.mainProgram = "muffin";
+      packages.${system} = rec {
+        muffin = pkgs.rustPlatform.buildRustPackage {
+          pname = "muffin";
+          version = "1.0.0";
+          cargoLock.lockFile = ./Cargo.lock;
+          src = pkgs.lib.cleanSource ./.;
+          meta.mainProgram = "muffin";
+        };
+        default = muffin;
       };
     };
 }

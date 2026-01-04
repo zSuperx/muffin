@@ -12,14 +12,17 @@ design decisions from it. Go check it out and show your support!_
 Usage: muffin [OPTIONS]
 
 OPTIONS:
-    -p, --presets <FILE>    Path to KDL file with session presets
-    -h, --help              Print help
+    -s, --start-preset <NAME>   Start preset
+    -l, --list-presets          List presets information
+    -p, --presets <FILE>        Path to presets file [default: ~/.config/muffin/presets.kdl]
+    -e, --exit-on-switch        Close muffin after switching to a session/preset
+    -h, --help                  Print help
 ```
 
 While `muffin` can be run from the command line, it's power is best utilized
 when bound to a key within `tmux`.
 
-For example, my config includes the following:
+For example, my `tmux.conf` includes the following:
 
 ```tmux
 # Override tmux's builtin session manager with muffin
@@ -52,10 +55,7 @@ My reasons for this are simple:
 
 ### Cargo
 
-This project _may_ require a nightly compiler to build the optimized release
-profile, so if that's something you don't want to install, simply comment out
-the entire `[profile.release]` block from the `Cargo.toml`. In either case,
-simply run:
+To build muffin, simply run:
 
 ```
 cargo build --release
@@ -63,10 +63,27 @@ cargo build --release
 
 and you should be good to go!
 
-_(I'm saying "may" because it's 3am at the time of writing this and I cba to
-actually find out)_
-
 ### Nix
 
 A simple `flake.nix` is also provided with `muffin` exposed as a package. This means
 you can run with `nix run github:zSuperx/muffin`.
+
+To properly add `muffin` to your `$PATH`, first add it to your flake inputs:
+```nix
+{
+  inputs.muffin.url = "github:zSuperx/muffin";
+  # ...
+}
+```
+then add the following to your `configuration.nix` or adjacent:
+```nix
+{ inputs, ... }:
+let
+  system = "x86_64-linux"; # or your system
+in
+{
+  environment.systemPkgs = [
+    inputs.muffin.packages.${system}.muffin
+  ];
+}
+```

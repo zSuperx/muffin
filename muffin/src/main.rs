@@ -114,7 +114,12 @@ async fn main() -> () {
         eprintln!("{e}");
         std::process::exit(1);
     });
-    let mut app = App::new(sessions, presets, dot_config_muffin.to_string(), exit_on_switch);
+    let mut app = App::new(
+        sessions,
+        presets,
+        dot_config_muffin.to_string(),
+        exit_on_switch,
+    );
 
     let mut terminal = ratatui::init();
     let app_result = app.run(&mut terminal).await;
@@ -132,6 +137,7 @@ OPTIONS:
     -s, --start-preset <NAME>   Start preset
     -l, --list-presets          List presets information
     -p, --presets <FILE>        Path to presets file [default: ~/.config/muffin/presets.kdl]
+    -e, --exit-on-switch        Close muffin after switching to a session/preset
     -h, --help                  Print help",
     );
 }
